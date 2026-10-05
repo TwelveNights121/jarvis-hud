@@ -214,16 +214,30 @@ function beep(pan=0, urgent=false){
 // ================= modelo =================
 async function loadModel(){
   const sb = $('startBtn'), ss = $('startStatus');
-  if (!window.cocoSsd || !window.tf){ ss.textContent = 'No se pudo descargar el modelo. Revisa tu conexión y recarga.'; sb.textContent='Sin modelo'; return; }
-  try {
-    try { await tf.setBackend('webgl'); } catch(e){}
-    await tf.ready();
-    st.model = await cocoSsd.load({base: S.model});
-    sb.disabled = false; sb.textContent = 'Iniciar JARVIS'; ss.textContent = 'Modelo listo · motor ' + tf.getBackend().toUpperCase();
-  } catch(e){
-    ss.textContent = 'Error al cargar el modelo: ' + (e && e.message ? e.message : e); sb.textContent='Reintentar'; sb.disabled=false;
-    sb.onclick = () => location.reload();
+  if (!window.cocoSsd || !window.tf){ ss.textContent = 'No se pudo descargar el motor de visión. Revisa tu conexión y recarga.'; sb.textContent='Reintentar'; sb.disabled=false; sb.onclick = () => location.reload(); return; }
+  const t0 = Date.now(); let phase = 'Iniciando motor';
+  const tick = setInterval(() => { ss.textContent = `${phase}… ${Math.round((Date.now()-t0)/1000)} s`; }, 500);
+  const withTimeout = (p, ms, label) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error(label)), ms))]);
+  // Intenta primero con la GPU (WebGL); si se cuelga o falla, usa el modo compatible (CPU).
+  const order = S.backend === 'cpu' ? ['cpu'] : ['webgl', 'cpu'];
+  let lastErr = null;
+  for (const be of order){
+    try {
+      phase = be === 'webgl' ? 'Iniciando motor gráfico' : 'Iniciando modo compatible';
+      await withTimeout(tf.setBackend(be), 10000, 'el motor ' + be + ' no respondió');
+      await withTimeout(tf.ready(), 10000, 'el motor ' + be + ' no respondió');
+      phase = 'Descargando y preparando el modelo';
+      st.model = await withTimeout(cocoSsd.load({base: S.model}), be === 'webgl' ? 45000 : 90000, 'el modelo tardó demasiado en cargar');
+      clearInterval(tick);
+      if (be === 'cpu' && S.backend !== 'cpu'){ S.backend = 'cpu'; saveS(); }
+      sb.disabled = false; sb.textContent = 'Iniciar JARVIS';
+      ss.textContent = 'Modelo listo · motor ' + (be === 'webgl' ? 'GPU' : 'compatible (más lento)');
+      return;
+    } catch(e){ lastErr = e; log('Motor ' + be + ': ' + (e.message || e), true); }
   }
+  clearInterval(tick);
+  ss.textContent = 'No se pudo cargar el modelo: ' + (lastErr && lastErr.message ? lastErr.message : lastErr) + '. Prueba con Wi-Fi y vuelve a intentar.';
+  sb.textContent = 'Reintentar'; sb.disabled = false; sb.onclick = () => { try { localStorage.removeItem('jarvis-hud'); } catch(e){} location.reload(); };
 }
 
 // ================= cámara =================
