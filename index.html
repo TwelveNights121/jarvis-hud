@@ -7,11 +7,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="JARVIS">
+<meta name="apple-mobile-web-app-title" content="JARVIS Vision">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>JARVIS HUD</title>
+<title>JARVIS Vision</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -49,6 +49,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .ring::after{content:"";width:46px;height:46px;border-radius:50%;border:2px solid var(--cyan);box-shadow:0 0 18px rgba(94,225,240,.6)}
 @media (prefers-reduced-motion:no-preference){.ring{animation:pulse 2.6s ease-in-out infinite}@keyframes pulse{50%{box-shadow:0 0 70px rgba(94,225,240,.55),inset 0 0 40px rgba(94,225,240,.35)}}}
 .start h1{margin:0;text-align:center;font:700 40px/1 var(--display);letter-spacing:2px}
+.start .ver{text-align:center;font:500 13px var(--mono);letter-spacing:3px;color:var(--cyan);margin-top:-8px}
 .start .sub{margin:0;text-align:center;color:var(--muted);font-size:15px;line-height:1.5}
 .start ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.6}
 .cta{min-height:56px;border-radius:14px;border:0;background:var(--cyan);color:#04161A;font:700 18px var(--display);letter-spacing:1px;cursor:pointer}
@@ -94,7 +95,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     <div class="box">
       <div class="ring" aria-hidden="true"></div>
       <h1>JARVIS</h1>
-      <p class="sub">HUD en vivo de los lentes JARVIS. Todo el análisis de video corre en este teléfono: las imágenes no salen de aquí.</p>
+      <div class="ver">VISION · v0.1.0 · prototipo</div>
+      <p class="sub">Módulo de visión de JARVIS. Todo el análisis de video corre en este teléfono: las imágenes no salen de aquí.</p>
       <ul>
         <li>Detecta personas, vehículos, animales y unos 80 tipos de objetos.</li>
         <li>Te avisa por voz y con un pitido del lado correcto si algo se acerca.</li>
@@ -130,6 +132,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     <label class="field" for="olModel">Modelo de visión<input id="olModel" type="text" placeholder="qwen2.5vl:3b" autocomplete="off"></label>
     <button class="btn2" id="olTest" type="button">Probar conexión</button>
 
+    <h3>JARVIS Core (opcional)</h3>
+    <label class="field" for="coreUrl">Conexión WebSocket con el núcleo de JARVIS (wss://)<input id="coreUrl" type="url" placeholder="wss://tu-pc.tu-red.ts.net:8443" autocomplete="off"></label>
+    <div class="row"><small id="coreState" style="color:var(--muted);font-size:13px">Estado: desconectado</small><button class="btn2" id="coreBtn" type="button" style="min-width:120px">Conectar</button></div>
+
     <h3>Registro</h3>
     <ul class="log" id="log"></ul>
   </section>
@@ -145,10 +151,10 @@ const video = $('video'), hud = $('hud'), ctx = hud.getContext('2d');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ================= ajustes =================
-const DEF = {model:'lite_mobilenet_v2', cam:'environment', alerts:'essential', voice:true, beep:true, listen:false, rec:false, anon:true, olUrl:'', olModel:'qwen2.5vl:3b'};
+const DEF = {model:'lite_mobilenet_v2', cam:'environment', alerts:'essential', voice:true, beep:true, listen:false, rec:false, anon:true, olUrl:'', olModel:'qwen2.5vl:3b', coreUrl:''};
 let S = DEF;
-try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('jarvis-hud') || '{}')); } catch(e){}
-const saveS = () => { try { localStorage.setItem('jarvis-hud', JSON.stringify(S)); } catch(e){} };
+try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('jarvis-vision') || '{}')); } catch(e){}
+const saveS = () => { try { localStorage.setItem('jarvis-vision', JSON.stringify(S)); } catch(e){} };
 
 // ================= etiquetas =================
 const ES = {person:'Persona',bicycle:'Bicicleta',car:'Carro',motorcycle:'Moto',airplane:'Avión',bus:'Bus',train:'Tren',truck:'Camión',boat:'Bote','traffic light':'Semáforo','fire hydrant':'Hidrante','stop sign':'Señal de alto','parking meter':'Parquímetro',bench:'Banca',bird:'Pájaro',cat:'Gato',dog:'Perro',horse:'Caballo',sheep:'Oveja',cow:'Vaca',elephant:'Elefante',bear:'Oso',zebra:'Cebra',giraffe:'Jirafa',backpack:'Mochila',umbrella:'Paraguas',handbag:'Bolso',tie:'Corbata',suitcase:'Maleta',frisbee:'Frisbee',skis:'Esquís',snowboard:'Snowboard','sports ball':'Balón',kite:'Cometa','baseball bat':'Bate','baseball glove':'Guante','skateboard':'Patineta',surfboard:'Tabla de surf','tennis racket':'Raqueta',bottle:'Botella','wine glass':'Copa',cup:'Taza',fork:'Tenedor',knife:'Cuchillo',spoon:'Cuchara',bowl:'Tazón',banana:'Banano',apple:'Manzana',sandwich:'Sándwich',orange:'Naranja',broccoli:'Brócoli',carrot:'Zanahoria','hot dog':'Hot dog',pizza:'Pizza',donut:'Dona',cake:'Pastel',chair:'Silla',couch:'Sillón','potted plant':'Planta',bed:'Cama','dining table':'Mesa',toilet:'Inodoro',tv:'Pantalla',laptop:'Laptop',mouse:'Mouse',remote:'Control',keyboard:'Teclado','cell phone':'Celular',microwave:'Microondas',oven:'Horno',toaster:'Tostadora',sink:'Lavamanos',refrigerator:'Refrigeradora',book:'Libro',clock:'Reloj',vase:'Florero',scissors:'Tijeras','teddy bear':'Peluche','hair drier':'Secadora',toothbrush:'Cepillo de dientes'};
@@ -237,7 +243,7 @@ async function loadModel(){
   }
   clearInterval(tick);
   ss.textContent = 'No se pudo cargar el modelo: ' + (lastErr && lastErr.message ? lastErr.message : lastErr) + '. Prueba con Wi-Fi y vuelve a intentar.';
-  sb.textContent = 'Reintentar'; sb.disabled = false; sb.onclick = () => { try { localStorage.removeItem('jarvis-hud'); } catch(e){} location.reload(); };
+  sb.textContent = 'Reintentar'; sb.disabled = false; sb.onclick = () => { try { localStorage.removeItem('jarvis-vision'); } catch(e){} location.reload(); };
 }
 
 // ================= cámara =================
@@ -319,6 +325,7 @@ function raise(text, pan, urgent, t, now, soft){
   t.alerted = now; st.lastAlertAt = now;
   if (!soft){ st.alert = text; st.alertUntil = now + 3200; }
   beep(pan, urgent); say(soft ? text : 'Atención: ' + text + '.'); log(text, !soft);
+  emit('alert', {texto:text, urgente:!!urgent, suave:!!soft, clase:t.cls, etiqueta:t.cls==='person'?'persona':(ES[t.cls]||t.cls), pan:+pan.toFixed(2), distancia_m:t.dist?+t.dist.toFixed(1):null});
 }
 const fmtD = d => d < 10 ? d.toFixed(1).replace('.0','') + ' m' : Math.round(d) + ' m';
 
@@ -327,8 +334,10 @@ async function detectLoop(){
   if (document.hidden || !st.model || video.readyState < 2){ setTimeout(detectLoop, 250); return; }
   try {
     const preds = await st.model.detect(video, 20, 0.5);
-    update(preds, performance.now());
+    const now = performance.now();
+    update(preds, now);
     st.frames++;
+    if (now - (st.lastEmit||0) > 500){ st.lastEmit = now; emit('detections', {fps:st.fps, objetos:sceneSnapshot()}); }
   } catch(e){ log('Error de detección: ' + (e.message || e), true); }
   requestAnimationFrame(detectLoop);
 }
@@ -475,6 +484,7 @@ async function saveEvent(){
   const o = document.createElement('canvas'); o.width=W; o.height=H; drawHUD(o.getContext('2d'), W, H, b => { let x=b[0]; if (S.cam==='user') x = W-b[0]-b[2]; return [x,b[1],b[2],b[3]]; }); cc.drawImage(o,0,0);
   const photo = await new Promise(r => c.toBlob(r, 'image/jpeg', .9)), ph = await sha256(photo);
   download(photo, `jarvis-evento-${id}.jpg`); log(`Evento ${id} · foto SHA-256 ${ph.slice(0,16)}…`);
+  emit('event_saved', {id, foto_sha256:ph, con_video:!!st.rec});
   if (!st.rec){ say('Evento sellado. Activa la caja negra en Ajustes para guardar también los segundos previos en video.'); return; }
   // video: cierra el segmento actual y guarda los dos últimos
   await new Promise(r => { st.onSegStop = r; st.rec.stop(); });
@@ -558,6 +568,7 @@ function handleCommand(raw){
   const t = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
   const cmd = t.replace(/^.*?jarvis[,\s]*/, '');
   log('Oído: “' + raw + '”');
+  emit('command', {texto:raw});
   if (!cmd) { say('¿Sí, señor?'); return; }
   if (/(que ves|que hay|alrededor|escanea)/.test(cmd)) return say(describeLocal());
   if (/(describe|describeme|analiza)/.test(cmd)) return askPC();
@@ -567,6 +578,7 @@ function handleCommand(raw){
   if (/(activa (las )?alertas|todas las alertas)/.test(cmd)){ S.alerts = /todas/.test(cmd) ? 'all' : 'essential'; $('alertSel').value=S.alerts; saveS(); return say('Alertas activadas.'); }
   if (/(hora)/.test(cmd)){ const d=new Date(); return say(`Son las ${d.getHours()}:${pad(d.getMinutes())}.`); }
   if (/(caja negra|activa la grabacion)/.test(cmd)){ setRec(true); return say('Caja negra activada.'); }
+  if (core && core.readyState === 1){ caption('Consultando a JARVIS Core…'); return; }
   return askPC(raw.replace(/^.*?jarvis[,\s]*/i, ''));
 }
 function listenOnce(){
@@ -616,7 +628,9 @@ $('startBtn').onclick = async () => {
   if (S.rec) startRec();
   if (S.listen && SR){ wantListen = true; listenOnce(); }
   say('Sistemas en línea. A sus órdenes, señor.');
-  log('JARVIS en línea · cámara ' + (S.cam === 'user' ? 'frontal' : 'trasera') + ' · ' + video.videoWidth + '×' + video.videoHeight);
+  emit('online', {camara:S.cam, resolucion:[video.videoWidth, video.videoHeight], motor:tf.getBackend()});
+  connectCore();
+  log('JARVIS Vision v' + VERSION + ' en línea · cámara ' + (S.cam === 'user' ? 'frontal' : 'trasera') + ' · ' + video.videoWidth + '×' + video.videoHeight);
 };
 $('micBtn').onclick = () => { if (st.listening && !wantListen){ try{ rec.stop(); }catch(e){} return; } if (wantListen){ toast('Escucha continua activa: di “JARVIS…”'); return; } listenOnce(); };
 $('seeBtn').onclick = () => say(describeLocal());
@@ -648,6 +662,57 @@ $('olTest').onclick = async () => {
     if (names.length && !names.includes(S.olModel)) log('Ojo: no encuentro “' + S.olModel + '” en tu PC', true);
   } catch(e){ toast('Sin conexión con tu PC'); log('No conecta con ' + url + ': ' + (e.message||e), true); }
 };
+
+// ================= integración con JARVIS Core =================
+// Protocolo: cada mensaje es {source:'jarvis-vision', version, type, ts, data}.
+// Salida: online, detections (2 por segundo), alert, command, event_saved, scene.
+// Entrada: {type:'say', text} · {type:'command', text} · {type:'alert', text} · {type:'get_scene'}.
+const VERSION = '0.1.0';
+const listeners = {};
+let core = null, coreRetry = 0;
+function emit(type, data){
+  const msg = {source:'jarvis-vision', version:VERSION, type, ts:Date.now(), data};
+  (listeners[type] || []).concat(listeners['*'] || []).forEach(fn => { try { fn(msg); } catch(e){} });
+  try { if (window.parent !== window) window.parent.postMessage(msg, '*'); } catch(e){}
+  try { if (core && core.readyState === 1) core.send(JSON.stringify(msg)); } catch(e){}
+}
+function sceneSnapshot(){
+  const vw = video.videoWidth || 1, vh = video.videoHeight || 1;
+  return st.tracks.map(t => ({id:t.id, clase:t.cls, etiqueta:t.cls === 'person' ? 'persona' : (ES[t.cls] || t.cls), tipo:kind(t.cls),
+    confianza:+t.score.toFixed(2), distancia_m:t.dist ? +t.dist.toFixed(1) : null, lado:sideOf(t, vw).txt,
+    caja:[t.bbox[0]/vw, t.bbox[1]/vh, t.bbox[2]/vw, t.bbox[3]/vh].map(v => +v.toFixed(3))}));
+}
+function handleInbound(m){
+  if (!m || typeof m !== 'object') return;
+  if (m.type === 'say' && m.text) say(String(m.text).slice(0, 500));
+  else if (m.type === 'command' && m.text) handleCommand('jarvis ' + String(m.text).slice(0, 200));
+  else if (m.type === 'alert' && m.text){ st.alert = String(m.text).slice(0, 120); st.alertUntil = performance.now() + 4000; beep(0, true); say('Atención: ' + st.alert); }
+  else if (m.type === 'get_scene') emit('scene', {objetos:sceneSnapshot(), resumen:describeLocal()});
+}
+function setCoreState(s){ st.coreState = s; const el = $('coreState'); if (el) el.textContent = 'Estado: ' + s; }
+function connectCore(){
+  const url = (S.coreUrl || '').trim();
+  try { if (core) { core.onclose = null; core.close(); } } catch(e){}
+  core = null;
+  if (!url){ setCoreState('desconectado'); return; }
+  try { core = new WebSocket(url); } catch(e){ setCoreState('dirección inválida (usa wss://)'); return; }
+  setCoreState('conectando…');
+  core.onopen = () => { coreRetry = 0; setCoreState('conectado'); log('Conectado a JARVIS Core'); emit('hello', {capacidades:['detections','alert','scene','event_saved','command','say']}); };
+  core.onmessage = e => { try { handleInbound(JSON.parse(e.data)); } catch(x){} };
+  core.onclose = () => { setCoreState('desconectado'); if (S.coreUrl && st.running){ coreRetry = Math.min(coreRetry + 1, 6); setTimeout(connectCore, 1000 * 2 ** coreRetry); } };
+}
+window.addEventListener('message', e => { if (window.parent !== window && e.source === window.parent && e.data && e.data.target === 'jarvis-vision') handleInbound(e.data); });
+window.JarvisVision = Object.freeze({
+  version: VERSION,
+  on: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+  say: t => say(String(t)),
+  command: t => handleCommand('jarvis ' + t),
+  scene: () => sceneSnapshot(),
+  describe: () => describeLocal()
+});
+$('coreUrl').value = S.coreUrl;
+$('coreUrl').onchange = e => { S.coreUrl = e.target.value.trim(); saveS(); };
+$('coreBtn').onclick = () => { S.coreUrl = $('coreUrl').value.trim(); saveS(); connectCore(); };
 
 loadModel();
 })();

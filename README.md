@@ -1,86 +1,81 @@
-# JARVIS HUD en vivo
+# JARVIS Vision
 
-HUD de los lentes JARVIS que corre en vivo en tu teléfono. La cámara, la detección de objetos, las alertas y la caja negra funcionan dentro del teléfono: el video no sale de ahí.
+**v0.1.0 · prototipo** · El módulo de visión del sistema JARVIS.
 
-## Qué hace
+Convierte la cámara de un teléfono (y en el futuro, la de los lentes JARVIS) en un HUD en vivo: detecta lo que tienes enfrente, te avisa si algo se acerca y le pasa todo al núcleo de JARVIS. El video se analiza dentro del teléfono y no sale de ahí.
 
-| Función | Cómo funciona | Equivale en los lentes a |
+## Qué hace la v0.1.0
+
+| Función | Cómo |
+|---|---|
+| Detección en vivo | COCO-SSD (TensorFlow.js) en el teléfono: personas, vehículos, animales y ~80 objetos |
+| Seguimiento | Cada objeto tiene un id estable y se sabe si se acerca |
+| Distancia aproximada | Altura típica de cada clase + campo de visión de la cámara |
+| Alertas direccionales | Voz + pitido del lado del peligro (audífonos) + vibración en Android |
+| Comandos de voz | “qué ves”, “briefing”, “guarda eso”, “silencio”, “hora” |
+| Briefing | Hora, batería, clima real (Open-Meteo) y escena |
+| Caja negra | Bucle de ~30 s con HUD, caras pixeladas y sello SHA-256 |
+| Privacidad | Las personas solo se marcan como “no registrada” |
+| Modo compatible | Si la GPU del teléfono falla, cambia sola a CPU |
+| Integración | Eventos para JARVIS Core por WebSocket, `postMessage` o `window.JarvisVision` |
+
+**Límites conocidos:** el modelo del teléfono tarda en reaccionar (sobre todo en modo compatible), las distancias son estimaciones y no reconoce quién es cada persona.
+
+## Usarlo
+
+Abre la página publicada en Safari (iPhone) o Chrome (Android), toca **Iniciar JARVIS** y acepta cámara y movimiento. Para tenerlo como app: Compartir → **Agregar a inicio**.
+
+Probarlo en la Mac: arrastra `index.html` a Chrome.
+
+## Integración con JARVIS Core
+
+Todos los mensajes tienen la misma forma:
+
+```json
+{ "source": "jarvis-vision", "version": "0.1.0", "type": "alert", "ts": 1791230000000, "data": { } }
+```
+
+**Lo que envía JARVIS Vision**
+
+| type | Cuándo | data |
 |---|---|---|
-| Detección en vivo | COCO-SSD (TensorFlow.js) en el teléfono: personas, vehículos, animales y ~80 objetos | YOLO en tu PC |
-| Distancia aproximada | Calculada con la altura típica de cada cosa y la cámara | Sensor VL53L5CX (Fase 3) |
-| “Se acerca” | Sigue cada objeto y avisa si crece rápido en la imagen | Alerta de JARVIS |
-| Pitido direccional | Suena del lado del peligro (con audífonos) y vibra en Android | Motores hápticos en las patillas |
-| Voz y comandos | “JARVIS, qué ves”, “briefing”, “guarda eso”, “silencio”, “hora” | Conducción ósea + palabra de activación |
-| Briefing | Hora, batería, clima real (Open-Meteo) y lo que tienes enfrente | Briefing de la mañana |
-| Caja negra | Grabación en bucle de ~30 s con el HUD, caras pixeladas y sello SHA-256 | microSD en los lentes |
-| Describir | Envía un cuadro a Ollama en tu PC (opcional) | El cerebro local |
+| `online` | Al iniciar | `camara`, `resolucion`, `motor` |
+| `hello` | Al conectarse al Core | `capacidades` |
+| `detections` | 2 veces por segundo | `fps`, `objetos[]` |
+| `alert` | Algo se acerca, vehículo muy cerca u objeto cortante | `texto`, `urgente`, `clase`, `etiqueta`, `pan` (-1 izq · +1 der), `distancia_m` |
+| `command` | El usuario dio una orden de voz | `texto` |
+| `event_saved` | Se selló un evento de la caja negra | `id`, `foto_sha256`, `con_video` |
+| `scene` | Respuesta a `get_scene` | `objetos[]`, `resumen` |
 
-## Paso 1: Publicarla gratis con GitHub Pages (10 minutos)
+Cada objeto: `{ id, clase, etiqueta, tipo, confianza, distancia_m, lado, caja:[x,y,w,h] }` (caja normalizada de 0 a 1).
 
-1. Crea una cuenta gratis en **github.com**.
-2. Arriba a la derecha toca **+ → New repository**.
-   - Nombre: `jarvis-hud`
-   - Visibilidad: **Public** (GitHub Pages gratis lo pide).
-   - Toca **Create repository**.
-3. En la página del repositorio toca **uploading an existing file** (o **Add file → Upload files**).
-4. Arrastra estos 3 archivos: `index.html`, `manifest.json`, `icon.svg`. Toca **Commit changes**.
-5. Ve a **Settings → Pages**.
-   - En **Source** elige **Deploy from a branch**.
-   - En **Branch** elige **main** y la carpeta **/ (root)**. Toca **Save**.
-6. Espera 1–2 minutos y recarga esa página: aparece tu link, algo como
-   `https://TU-USUARIO.github.io/jarvis-hud/`
+**Lo que acepta JARVIS Vision**
 
-## Paso 2: Usarla en tu teléfono
+| type | Efecto |
+|---|---|
+| `{ "type": "say", "text": "…" }` | Lo dice en voz alta y lo muestra |
+| `{ "type": "command", "text": "qué ves" }` | Ejecuta una orden como si se hubiera dicho |
+| `{ "type": "alert", "text": "…" }` | Muestra una alerta con pitido |
+| `{ "type": "get_scene" }` | Responde con un mensaje `scene` |
 
-1. Abre el link en **Safari** (iPhone) o **Chrome** (Android).
-2. Espera a que diga **Iniciar JARVIS** (descarga el modelo de ~5 MB la primera vez).
-3. Toca **Iniciar JARVIS** y acepta los permisos de **cámara** y **movimiento** (brújula).
-4. Ponte audífonos para oír de qué lado vienen las alertas.
+**Tres formas de conectarse**
 
-Para que se abra a pantalla completa como una app:
-- **iPhone:** botón Compartir → **Agregar a inicio**.
-- **Android:** menú ⋮ → **Agregar a la pantalla principal**.
+1. **WebSocket** (recomendado): Ajustes → JARVIS Core → `wss://…`. Ejemplo listo en [`core/vision_bridge.py`](core/vision_bridge.py), que registra eventos y responde preguntas con Ollama.
+2. **iframe**: si otra página de JARVIS lo incrusta, recibe los eventos por `postMessage`, y le puede enviar mensajes con `target: "jarvis-vision"`.
+3. **En la misma página**: `JarvisVision.on('alert', m => …)`, `JarvisVision.say('…')`, `JarvisVision.scene()`.
 
-### Comandos de voz
+Desde una página `https` solo se puede conectar a `wss://`. Con Tailscale: `tailscale serve --bg --https=8443 http://localhost:8765`.
 
-Toca **Hablar** y di la orden (no hace falta decir “JARVIS” con el botón):
+## Hoja de ruta
 
-- **“¿Qué ves?”**: resumen de lo que tienes enfrente.
-- **“Briefing”**: hora, batería, clima y entorno. La primera vez pide tu ubicación.
-- **“Guarda eso”**: sella el evento (foto con HUD y, si la caja negra está activa, los últimos segundos de video).
-- **“Describe”**: descripción completa usando tu PC (Paso 3).
-- **“Silencio”** / **“Activa alertas”** / **“Hora”**.
+- **v0.2** · Conexión estable con JARVIS Core y Ollama · reconocimiento de caras registradas con permiso (en el PC).
+- **v0.3** · Memoria episódica (dónde viste tus cosas) · lectura y traducción de letreros.
+- **v1.0** · Cámara de los lentes (XIAO ESP32-S3) en vez del teléfono · YOLO en la RTX 5050.
 
-En Android puedes activar **Escucha continua** en Ajustes y hablarle sin tocar nada: “JARVIS, ¿qué ves?”.
+## Archivos
 
-## Paso 3 (opcional): Conectar el cerebro de tu PC
-
-Esto hace que **Describir** y las preguntas libres usen Ollama en tu PC, gratis.
-
-1. En tu PC instala un modelo de visión:
-   ```
-   ollama pull qwen2.5vl:3b
-   ```
-2. Permite que tu página hable con Ollama. En Windows abre PowerShell y escribe (cambia TU-USUARIO):
-   ```
-   setx OLLAMA_ORIGINS "https://TU-USUARIO.github.io"
-   ```
-   Cierra Ollama desde la bandeja del sistema y ábrelo de nuevo.
-3. Instala **Tailscale** (gratis) en tu PC y en tu teléfono, con la misma cuenta.
-   En la consola de Tailscale activa **MagicDNS** y **HTTPS Certificates** (en DNS).
-4. En tu PC, en PowerShell:
-   ```
-   tailscale serve --bg 11434
-   ```
-   Te muestra una dirección como `https://tu-pc.tu-red.ts.net`.
-5. En la app: **Ajustes → Cerebro en tu PC**, pega esa dirección y toca **Probar conexión**.
-
-El teléfono necesita una dirección **https** para hablar con tu PC; por eso se usa Tailscale y no la IP local.
-
-## Límites a saber
-
-- El modelo del teléfono es más simple que YOLO en tu RTX 5050: se equivoca más con objetos pequeños o lejanos.
-- Las distancias son estimaciones con alturas típicas (persona 1.7 m, carro 1.5 m).
-- La escucha continua solo funciona bien en Chrome de Android. En iPhone usa el botón **Hablar**.
-- La vibración no existe en iPhone; ahí el aviso es el pitido direccional.
-- Detecta “persona”, pero no reconoce quién es: el reconocimiento de caras registradas va en tu PC (InsightFace).
+| Archivo | Qué es |
+|---|---|
+| `index.html` | Toda la app |
+| `manifest.json`, `icon.svg` | Para instalarla como app |
+| `core/vision_bridge.py` | Puente de ejemplo con el núcleo de JARVIS en tu PC |

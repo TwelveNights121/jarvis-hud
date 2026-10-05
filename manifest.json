@@ -1,7 +1,7 @@
 {
-  "name": "JARVIS HUD",
-  "short_name": "JARVIS",
-  "description": "HUD en vivo de los lentes JARVIS: detección local, alertas direccionales, voz y caja negra.",
+  "name": "JARVIS Vision",
+  "short_name": "JARVIS Vision",
+  "description": "Módulo de visión de JARVIS: detección en vivo, alertas direccionales, voz y caja negra.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
