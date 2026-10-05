@@ -1,0 +1,14 @@
+{
+  "name": "JARVIS HUD",
+  "short_name": "JARVIS",
+  "description": "HUD en vivo de los lentes JARVIS: detección local, alertas direccionales, voz y caja negra.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#070B0E",
+  "theme_color": "#070B0E",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

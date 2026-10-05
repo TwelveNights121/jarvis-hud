@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070B0E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>JARVIS HUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#070B0E; --panel:rgba(10,16,20,.86); --solid:#0F171C; --line:#1F3A44; --fg:#E6F1F4; --muted:#9FB6BE;
+  --cyan:#5EE1F0; --amber:#F5B14C; --green:#7CF29A; --red:#FF7A7A;
+  --display:'Chakra Petch','Arial Narrow',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidden;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+#app{position:fixed;inset:0}
+video,#hud{position:absolute;inset:0;width:100%;height:100%}
+video{object-fit:cover;background:#000}
+#hud{pointer-events:none}
+.caption{position:absolute;left:12px;right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));padding:10px 14px;background:var(--panel);border-left:3px solid var(--cyan);border-radius:10px;font-size:15px;line-height:1.45;max-height:30vh;overflow:auto}
+.caption b{font-family:var(--mono);font-weight:500;color:var(--cyan);margin-right:6px}
+.bar{position:absolute;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;background:linear-gradient(to top,rgba(7,11,14,.92),rgba(7,11,14,.6))}
+.bar button{min-height:62px;padding:6px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(15,23,28,.9);color:var(--fg);font:600 12px/1.2 var(--body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.bar button svg{width:22px;height:22px;stroke:var(--cyan)}
+.bar button.on{border-color:var(--cyan);background:rgba(94,225,240,.16)}
+.bar button.rec svg{stroke:var(--red)}
+.bar button:active{transform:scale(.97)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.toast{position:absolute;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:var(--solid);border:1px solid var(--line);font:500 13px var(--mono);color:var(--cyan);max-width:90vw;text-align:center;opacity:0;transition:opacity .25s}
+.toast.show{opacity:1}
+
+/* pantalla de inicio */
+.start{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:radial-gradient(circle at 50% 35%,#0E1C23 0%,var(--bg) 70%);overflow:auto}
+.start .box{max-width:460px;width:100%;display:flex;flex-direction:column;gap:16px}
+.ring{width:120px;height:120px;margin:0 auto;border-radius:50%;border:3px solid var(--cyan);box-shadow:0 0 40px rgba(94,225,240,.35),inset 0 0 30px rgba(94,225,240,.25);display:flex;align-items:center;justify-content:center}
+.ring::after{content:"";width:46px;height:46px;border-radius:50%;border:2px solid var(--cyan);box-shadow:0 0 18px rgba(94,225,240,.6)}
+@media (prefers-reduced-motion:no-preference){.ring{animation:pulse 2.6s ease-in-out infinite}@keyframes pulse{50%{box-shadow:0 0 70px rgba(94,225,240,.55),inset 0 0 40px rgba(94,225,240,.35)}}}
+.start h1{margin:0;text-align:center;font:700 40px/1 var(--display);letter-spacing:2px}
+.start .sub{margin:0;text-align:center;color:var(--muted);font-size:15px;line-height:1.5}
+.start ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.6}
+.cta{min-height:56px;border-radius:14px;border:0;background:var(--cyan);color:#04161A;font:700 18px var(--display);letter-spacing:1px;cursor:pointer}
+.cta:disabled{opacity:.5}
+.status{text-align:center;font:500 13px var(--mono);color:var(--muted);min-height:20px}
+
+/* ajustes */
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:85vh;overflow:auto;background:var(--solid);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.sheet h2{margin:0;font:700 22px var(--display);letter-spacing:.5px}
+.sheet h3{margin:6px 0 0;font:600 13px var(--mono);letter-spacing:1.5px;color:var(--cyan);text-transform:uppercase}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:15px}
+.row small{display:block;color:var(--muted);font-size:13px}
+.row select,.field input{font:inherit;font-size:16px;background:#0A1216;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+.switch{appearance:none;-webkit-appearance:none;width:52px;height:30px;border-radius:999px;background:#22323A;position:relative;flex:0 0 auto;cursor:pointer}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#9FB6BE;transition:left .2s}
+.switch:checked{background:rgba(94,225,240,.4)}
+.switch:checked::after{left:25px;background:var(--cyan)}
+.btn2{min-height:48px;border-radius:12px;border:1px solid var(--line);background:#132028;color:var(--fg);font:600 15px var(--body);cursor:pointer}
+.btn2.primary{background:var(--cyan);color:#04161A;border-color:var(--cyan)}
+.log{list-style:none;margin:0;padding:0;font:12.5px/1.5 var(--mono);color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.log li time{color:var(--cyan);margin-right:8px}
+.log li.alert{color:var(--amber)}
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="hud"></canvas>
+  <div class="caption" id="caption" hidden><b>JARVIS ›</b><span id="capText"></span></div>
+  <div class="toast" id="toast"></div>
+  <div id="safe" aria-hidden="true" style="position:absolute;visibility:hidden;padding-top:env(safe-area-inset-top,0px)"></div>
+
+  <nav class="bar" id="bar" hidden aria-label="Controles">
+    <button id="micBtn" type="button" aria-label="Hablar con JARVIS"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Hablar</button>
+    <button id="seeBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>¿Qué ves?</button>
+    <button id="descBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Describir</button>
+    <button id="saveBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Guardar</button>
+    <button id="menuBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Ajustes</button>
+  </nav>
+
+  <section class="start" id="start">
+    <div class="box">
+      <div class="ring" aria-hidden="true"></div>
+      <h1>JARVIS</h1>
+      <p class="sub">HUD en vivo de los lentes JARVIS. Todo el análisis de video corre en este teléfono: las imágenes no salen de aquí.</p>
+      <ul>
+        <li>Detecta personas, vehículos, animales y unos 80 tipos de objetos.</li>
+        <li>Te avisa por voz y con un pitido del lado correcto si algo se acerca.</li>
+        <li>Di <b>“JARVIS, qué ves”</b>, <b>“briefing”</b> o <b>“guarda eso”</b>.</li>
+        <li>Caja negra: guarda los últimos 30 s con un sello SHA-256.</li>
+      </ul>
+      <button class="cta" id="startBtn" type="button" disabled>Cargando modelo…</button>
+      <div class="status" id="startStatus">Descargando el modelo de visión (unos 5 MB)…</div>
+    </div>
+  </section>
+
+  <section class="sheet" id="sheet" hidden aria-label="Ajustes">
+    <div class="row"><h2>Ajustes</h2><button class="btn2" id="closeSheet" type="button" style="min-width:96px">Cerrar</button></div>
+
+    <h3>Visión</h3>
+    <div class="row"><span>Modelo<small>Rápido para teléfonos; preciso si tu teléfono es potente.</small></span>
+      <select id="modelSel"><option value="lite_mobilenet_v2">Rápido</option><option value="mobilenet_v2">Preciso</option></select></div>
+    <div class="row"><span>Cámara</span><select id="camSel"><option value="environment">Trasera</option><option value="user">Frontal</option></select></div>
+
+    <h3>Alertas</h3>
+    <div class="row"><span>Nivel<small>Esenciales: solo lo que se acerca o es peligroso.</small></span>
+      <select id="alertSel"><option value="essential">Esenciales</option><option value="all">Todas</option><option value="off">Silencio</option></select></div>
+    <div class="row"><span>Voz de JARVIS</span><input class="switch" type="checkbox" id="voiceSw" checked aria-label="Voz de JARVIS"></div>
+    <div class="row"><span>Pitido direccional<small>Suena del lado del peligro (mejor con audífonos).</small></span><input class="switch" type="checkbox" id="beepSw" checked aria-label="Pitido direccional"></div>
+    <div class="row"><span>Escucha continua<small>Solo Android/Chrome. Di “JARVIS” y tu orden.</small></span><input class="switch" type="checkbox" id="listenSw" aria-label="Escucha continua"></div>
+
+    <h3>Caja negra</h3>
+    <div class="row"><span>Grabación en bucle<small>Mantiene los últimos ~30 s con el HUD.</small></span><input class="switch" type="checkbox" id="recSw" aria-label="Grabación en bucle"></div>
+    <div class="row"><span>Anonimizar personas<small>Pixela las caras en lo que se graba.</small></span><input class="switch" type="checkbox" id="anonSw" checked aria-label="Anonimizar personas"></div>
+
+    <h3>Cerebro en tu PC (opcional)</h3>
+    <label class="field" for="olUrl">Dirección de Ollama (https, por ejemplo de Tailscale)<input id="olUrl" type="url" placeholder="https://tu-pc.tu-red.ts.net" autocomplete="off"></label>
+    <label class="field" for="olModel">Modelo de visión<input id="olModel" type="text" placeholder="qwen2.5vl:3b" autocomplete="off"></label>
+    <button class="btn2" id="olTest" type="button">Probar conexión</button>
+
+    <h3>Registro</h3>
+    <ul class="log" id="log"></ul>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const video = $('video'), hud = $('hud'), ctx = hud.getContext('2d');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ================= ajustes =================
+const DEF = {model:'lite_mobilenet_v2', cam:'environment', alerts:'essential', voice:true, beep:true, listen:false, rec:false, anon:true, olUrl:'', olModel:'qwen2.5vl:3b'};
+let S = DEF;
+try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('jarvis-hud') || '{}')); } catch(e){}
+const saveS = () => { try { localStorage.setItem('jarvis-hud', JSON.stringify(S)); } catch(e){} };
+
+// ================= etiquetas =================
+const ES = {person:'Persona',bicycle:'Bicicleta',car:'Carro',motorcycle:'Moto',airplane:'Avión',bus:'Bus',train:'Tren',truck:'Camión',boat:'Bote','traffic light':'Semáforo','fire hydrant':'Hidrante','stop sign':'Señal de alto','parking meter':'Parquímetro',bench:'Banca',bird:'Pájaro',cat:'Gato',dog:'Perro',horse:'Caballo',sheep:'Oveja',cow:'Vaca',elephant:'Elefante',bear:'Oso',zebra:'Cebra',giraffe:'Jirafa',backpack:'Mochila',umbrella:'Paraguas',handbag:'Bolso',tie:'Corbata',suitcase:'Maleta',frisbee:'Frisbee',skis:'Esquís',snowboard:'Snowboard','sports ball':'Balón',kite:'Cometa','baseball bat':'Bate','baseball glove':'Guante','skateboard':'Patineta',surfboard:'Tabla de surf','tennis racket':'Raqueta',bottle:'Botella','wine glass':'Copa',cup:'Taza',fork:'Tenedor',knife:'Cuchillo',spoon:'Cuchara',bowl:'Tazón',banana:'Banano',apple:'Manzana',sandwich:'Sándwich',orange:'Naranja',broccoli:'Brócoli',carrot:'Zanahoria','hot dog':'Hot dog',pizza:'Pizza',donut:'Dona',cake:'Pastel',chair:'Silla',couch:'Sillón','potted plant':'Planta',bed:'Cama','dining table':'Mesa',toilet:'Inodoro',tv:'Pantalla',laptop:'Laptop',mouse:'Mouse',remote:'Control',keyboard:'Teclado','cell phone':'Celular',microwave:'Microondas',oven:'Horno',toaster:'Tostadora',sink:'Lavamanos',refrigerator:'Refrigeradora',book:'Libro',clock:'Reloj',vase:'Florero',scissors:'Tijeras','teddy bear':'Peluche','hair drier':'Secadora',toothbrush:'Cepillo de dientes'};
+const VEH = new Set(['car','bus','truck','motorcycle','bicycle','train']);
+const ANI = new Set(['dog','cat','horse','cow','sheep','bird','bear','elephant','zebra','giraffe']);
+const DANGER = new Set(['knife','scissors','baseball bat']);
+const HEIGHT_M = {person:1.7, car:1.5, bus:3.2, truck:3.0, motorcycle:1.2, bicycle:1.1, dog:0.6, cat:0.3, chair:0.9, 'stop sign':0.75, 'traffic light':1.0, bench:0.8};
+const kind = c => c==='person' ? 'persona' : VEH.has(c) ? 'vehiculo' : ANI.has(c) ? 'animal' : DANGER.has(c) ? 'peligro' : 'objeto';
+const COLOR = {persona:'#5EE1F0', vehiculo:'#F5B14C', animal:'#7CF29A', peligro:'#FF7A7A', objeto:'#8FD3DD'};
+const plural = (n, s) => n === 1 ? `1 ${s.toLowerCase()}` : `${n} ${pluralize(s.toLowerCase())}`;
+const pluralize = s => /[aeiouáéó]$/.test(s) ? s+'s' : /z$/.test(s) ? s.slice(0,-1)+'ces' : s+'es';
+
+// ================= estado =================
+const st = {
+  model:null, stream:null, running:false, tracks:[], nextId:1, fps:0, frames:0, fpsT:performance.now(),
+  alert:null, alertUntil:0, lastAlertAt:0, heading:null, battery:null, weather:null, listening:false,
+  rec:null, segs:[], cur:[], segStart:0, comp:null, compCtx:null, lastComp:0, wake:null, describing:false
+};
+
+// ================= utilidades =================
+const pad = n => String(n).padStart(2,'0');
+const clock = (d=new Date()) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+function log(msg, alert){
+  const li = document.createElement('li'); if (alert) li.className='alert';
+  const t = document.createElement('time'); t.textContent = clock(); li.append(t, document.createTextNode(msg));
+  $('log').prepend(li); while ($('log').children.length > 30) $('log').lastChild.remove();
+}
+let toastT;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2600); }
+function caption(text){ $('caption').hidden = false; $('capText').textContent = text; }
+let esVoice = null;
+function pickVoice(){ const vs = speechSynthesis.getVoices(); esVoice = vs.find(v=>/^es[-_](MX|US|419|CR|CO)/i.test(v.lang)) || vs.find(v=>/^es/i.test(v.lang)) || null; }
+if ('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function say(text, {interrupt=true}={}){
+  caption(text);
+  if (!S.voice || !('speechSynthesis' in window)) return;
+  try {
+    if (interrupt) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (esVoice) u.voice = esVoice; u.lang = esVoice ? esVoice.lang : 'es-MX'; u.rate = 1.05; u.pitch = 0.92;
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+
+// ================= audio direccional =================
+let ac = null;
+function beep(pan=0, urgent=false){
+  if (!S.beep) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const t = ac.currentTime, n = urgent ? 2 : 1;
+    for (let i=0;i<n;i++){
+      const o = ac.createOscillator(), g = ac.createGain(), p = ac.createStereoPanner ? ac.createStereoPanner() : null;
+      o.type='sine'; o.frequency.value = urgent ? 1180 : 880;
+      g.gain.setValueAtTime(0.0001, t+i*0.18); g.gain.exponentialRampToValueAtTime(0.35, t+i*0.18+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+i*0.18+0.14);
+      if (p){ p.pan.value = Math.max(-1, Math.min(1, pan)); o.connect(g).connect(p).connect(ac.destination); } else o.connect(g).connect(ac.destination);
+      o.start(t+i*0.18); o.stop(t+i*0.18+0.16);
+    }
+  } catch(e){}
+  try { if (navigator.vibrate) navigator.vibrate(pan < -0.25 ? [220] : pan > 0.25 ? [70,60,70] : [120,60,120]); } catch(e){}
+}
+
+// ================= modelo =================
+async function loadModel(){
+  const sb = $('startBtn'), ss = $('startStatus');
+  if (!window.cocoSsd || !window.tf){ ss.textContent = 'No se pudo descargar el modelo. Revisa tu conexión y recarga.'; sb.textContent='Sin modelo'; return; }
+  try {
+    try { await tf.setBackend('webgl'); } catch(e){}
+    await tf.ready();
+    st.model = await cocoSsd.load({base: S.model});
+    sb.disabled = false; sb.textContent = 'Iniciar JARVIS'; ss.textContent = 'Modelo listo · motor ' + tf.getBackend().toUpperCase();
+  } catch(e){
+    ss.textContent = 'Error al cargar el modelo: ' + (e && e.message ? e.message : e); sb.textContent='Reintentar'; sb.disabled=false;
+    sb.onclick = () => location.reload();
+  }
+}
+
+// ================= cámara =================
+async function startCamera(){
+  if (st.stream) st.stream.getTracks().forEach(t=>t.stop());
+  const constraints = {audio:false, video:{facingMode:{ideal:S.cam}, width:{ideal:1280}, height:{ideal:720}}};
+  st.stream = await navigator.mediaDevices.getUserMedia(constraints);
+  video.srcObject = st.stream;
+  await new Promise(r => { if (video.readyState >= 1) r(); else video.onloadedmetadata = r; });
+  await video.play();
+  video.width = video.videoWidth; video.height = video.videoHeight;
+  video.style.transform = S.cam === 'user' ? 'scaleX(-1)' : '';
+  fit();
+}
+
+// ================= ajuste del lienzo =================
+let view = {cw:0, ch:0, sc:1, ox:0, oy:0, dpr:1};
+function fit(){
+  const dpr = Math.min(devicePixelRatio || 1, 2), cw = innerWidth, ch = innerHeight;
+  hud.width = Math.round(cw*dpr); hud.height = Math.round(ch*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+  const vw = video.videoWidth || cw, vh = video.videoHeight || ch, sc = Math.max(cw/vw, ch/vh);
+  const safeTop = parseFloat(getComputedStyle($('safe')).paddingTop) || 0;
+  view = {cw, ch, sc, ox:(cw - vw*sc)/2, oy:(ch - vh*sc)/2, dpr, safeTop};
+}
+addEventListener('resize', fit);
+addEventListener('orientationchange', () => setTimeout(fit, 300));
+
+// ================= detección y seguimiento =================
+function iou(a,b){
+  const x1=Math.max(a[0],b[0]), y1=Math.max(a[1],b[1]), x2=Math.min(a[0]+a[2],b[0]+b[2]), y2=Math.min(a[1]+a[3],b[1]+b[3]);
+  const inter = Math.max(0,x2-x1)*Math.max(0,y2-y1); return inter / (a[2]*a[3] + b[2]*b[3] - inter || 1);
+}
+function distance(cls, bh){
+  const H = HEIGHT_M[cls]; if (!H || !video.videoHeight) return null;
+  const vfov = (video.videoHeight > video.videoWidth ? 70 : 48) * Math.PI/180; // FOV vertical aproximado
+  const f = (video.videoHeight/2) / Math.tan(vfov/2);
+  const d = H * f / bh; return d > 0.3 && d < 60 ? d : null;
+}
+function update(preds, now){
+  const vw = video.videoWidth, vh = video.videoHeight, area = vw*vh;
+  const used = new Set();
+  for (const p of preds){
+    let best=null, bi=0.25;
+    for (const t of st.tracks){ if (used.has(t) || t.cls !== p.class) continue; const v = iou(t.bbox, p.bbox); if (v > bi){ bi=v; best=t; } }
+    if (best){
+      // suavizado para que las cajas no tiemblen
+      best.bbox = best.bbox.map((v,i)=> v*0.45 + p.bbox[i]*0.55); best.score = p.score; best.seen = now; used.add(best);
+    } else {
+      best = {id:st.nextId++, cls:p.class, bbox:p.bbox.slice(), score:p.score, born:now, seen:now, hist:[], alerted:0, announced:false}; st.tracks.push(best); used.add(best);
+    }
+    best.hist.push({t:now, a:(best.bbox[2]*best.bbox[3])/area});
+    best.hist = best.hist.filter(h => now - h.t < 1400);
+    best.dist = distance(best.cls, best.bbox[3]);
+  }
+  st.tracks = st.tracks.filter(t => now - t.seen < 700);
+  for (const t of st.tracks) if (used.has(t)) evaluate(t, now, vw);
+}
+function sideOf(t, vw){ const cx = (t.bbox[0] + t.bbox[2]/2)/vw; const x = S.cam === 'user' ? 1-cx : cx; return {x, txt: x < .36 ? 'por su izquierda' : x > .64 ? 'por su derecha' : 'de frente', pan:(x-.5)*2}; }
+function evaluate(t, now, vw){
+  if (S.alerts === 'off') return;
+  const k = kind(t.cls), a = t.hist[t.hist.length-1].a, first = t.hist[0];
+  const s = sideOf(t, vw);
+  const cool = now - st.lastAlertAt > 2500 && now - t.alerted > 6000;
+  const name = ES[t.cls] || t.cls;
+  // se acerca
+  if ((k === 'persona' || k === 'vehiculo' || k === 'animal') && first && now - first.t > 600 && a > 0.05 && a / Math.max(first.a, 0.001) > 1.35 && cool){
+    raise(`${name} acercándose ${s.txt}`, s.pan, k === 'vehiculo', t, now); return;
+  }
+  // vehículo muy cerca
+  if (k === 'vehiculo' && a > 0.22 && cool){ raise(`${name} muy cerca ${s.txt}`, s.pan, true, t, now); return; }
+  // objeto peligroso
+  if (k === 'peligro' && t.score > 0.6 && cool && !t.announced){ t.announced = true; raise(`${name} a la vista ${s.txt}`, s.pan, true, t, now); return; }
+  // modo "todas": avisa nuevas personas y animales
+  if (S.alerts === 'all' && !t.announced && now - t.born > 800 && (k === 'persona' || k === 'animal') && cool){
+    t.announced = true; raise(`${name} ${s.txt}${t.dist ? ', a unos ' + fmtD(t.dist) : ''}`, s.pan, false, t, now, true);
+  }
+}
+function raise(text, pan, urgent, t, now, soft){
+  t.alerted = now; st.lastAlertAt = now;
+  if (!soft){ st.alert = text; st.alertUntil = now + 3200; }
+  beep(pan, urgent); say(soft ? text : 'Atención: ' + text + '.'); log(text, !soft);
+}
+const fmtD = d => d < 10 ? d.toFixed(1).replace('.0','') + ' m' : Math.round(d) + ' m';
+
+async function detectLoop(){
+  if (!st.running) return;
+  if (document.hidden || !st.model || video.readyState < 2){ setTimeout(detectLoop, 250); return; }
+  try {
+    const preds = await st.model.detect(video, 20, 0.5);
+    update(preds, performance.now());
+    st.frames++;
+  } catch(e){ log('Error de detección: ' + (e.message || e), true); }
+  requestAnimationFrame(detectLoop);
+}
+
+// ================= dibujo =================
+const placed = [];
+const hit = (a,b) => a.x < b.x+b.w && b.x < a.x+a.w && a.y < b.y+b.h && b.y < a.y+a.h;
+function tag(c, lines, x, y, size, color, bg='rgba(7,11,14,.8)'){
+  c.font = `${size}px "IBM Plex Mono", ui-monospace, monospace`; c.textBaseline = 'top';
+  const lh = size*1.45, p = size*.55, w = Math.max(...lines.map(l=>c.measureText(l).width)) + p*2, h = lines.length*lh + p*1.2;
+  c.fillStyle = bg; c.fillRect(x, y, w, h); c.fillStyle = color;
+  lines.forEach((l,i)=>c.fillText(l, x+p, y+p*.6+i*lh)); return {x,y,w,h};
+}
+function toScreen(b){ // de pixeles del video a pantalla (con espejo en frontal)
+  let x = view.ox + b[0]*view.sc, y = view.oy + b[1]*view.sc, w = b[2]*view.sc, h = b[3]*view.sc;
+  if (S.cam === 'user') x = view.cw - x - w;
+  return [x,y,w,h];
+}
+function drawHUD(c, W, H, map, opts={}){
+  const s = Math.max(.85, Math.min(W,H)/430), now = performance.now();
+  c.clearRect(0,0,W,H); placed.length = 0;
+  c.lineWidth = 2*s; c.strokeStyle = '#5EE1F0';
+  const top = (opts.safeTop||0), L = 24*s, m = 12*s;
+  [[m,m+top,1,1],[W-m,m+top,-1,1],[m,H-m,1,-1],[W-m,H-m,-1,-1]].forEach(([x,y,dx,dy])=>{ c.beginPath(); c.moveTo(x,y+dy*L); c.lineTo(x,y); c.lineTo(x+dx*L,y); c.stroke(); });
+  // retícula
+  const cx=W/2, cy=H/2, r=Math.min(W,H)*.045;
+  c.globalAlpha=.8; c.beginPath(); c.arc(cx,cy,r,0,Math.PI*2); c.stroke();
+  c.beginPath(); [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>{ c.moveTo(cx+dx*r*1.25,cy+dy*r*1.25); c.lineTo(cx+dx*r*1.9,cy+dy*r*1.9); }); c.stroke();
+  c.globalAlpha=1; c.fillStyle='#5EE1F0'; c.beginPath(); c.arc(cx,cy,2.5*s,0,Math.PI*2); c.fill();
+  // telemetría
+  const l1 = `SYS EN LÍNEA · LOCAL · ${st.fps} FPS`;
+  const l2 = [clock(), st.battery != null ? `BAT ${st.battery}%` : null, st.rec ? '● BUCLE' : null, st.weather ? st.weather.short : null].filter(Boolean).join(' · ');
+  placed.push(tag(c, [l1, l2], 14*s, 14*s + top, Math.round(11*s), '#5EE1F0'));
+  // brújula
+  if (st.heading != null){
+    const hw = Math.min(W*.5, 260*s), hx = W/2 - hw/2, hy = 14*s + top;
+    c.fillStyle='rgba(7,11,14,.7)'; c.fillRect(hx, hy, hw, 26*s);
+    c.save(); c.beginPath(); c.rect(hx, hy, hw, 26*s); c.clip();
+    c.font = `${Math.round(11*s)}px "IBM Plex Mono", monospace`; c.textBaseline='middle'; c.textAlign='center';
+    const card = {0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SO',270:'O',315:'NO'};
+    for (let d=-90; d<=90; d+=15){
+      const deg = ((Math.round(st.heading/15)*15 + d) % 360 + 360) % 360, off = ((deg - st.heading + 540) % 360) - 180;
+      const x = W/2 + off * (hw/180);
+      c.fillStyle = card[deg] ? '#E6F1F4' : '#5EE1F0'; c.fillText(card[deg] || '·', x, hy + 13*s);
+    }
+    c.restore(); c.textAlign='left';
+    c.fillStyle='#5EE1F0'; c.fillRect(W/2-1*s, hy+20*s, 2*s, 8*s);
+    placed.push({x:hx, y:hy, w:hw, h:26*s});
+  }
+  // cajas
+  for (const t of st.tracks){
+    const [x,y,w,h] = map(t.bbox), k = kind(t.cls), col = COLOR[k];
+    if (x + w < 8 || y + h < 8 || x > W - 8 || y > H - 8) continue; // fuera de lo visible
+    const approaching = now - t.alerted < 2000;
+    c.strokeStyle = approaching ? '#F5B14C' : col; c.lineWidth = (approaching ? 3 : 2)*s;
+    const kk = Math.min(18*s, w/3, h/3);
+    c.beginPath();
+    c.moveTo(x,y+kk); c.lineTo(x,y); c.lineTo(x+kk,y); c.moveTo(x+w-kk,y); c.lineTo(x+w,y); c.lineTo(x+w,y+kk);
+    c.moveTo(x+w,y+h-kk); c.lineTo(x+w,y+h); c.lineTo(x+w-kk,y+h); c.moveTo(x+kk,y+h); c.lineTo(x,y+h); c.lineTo(x,y+h-kk); c.stroke();
+    c.globalAlpha=.3; c.lineWidth=1*s; c.strokeRect(x,y,w,h); c.globalAlpha=1;
+    const head = k === 'persona' ? 'PERSONA · NO REGISTRADA' : (ES[t.cls] || t.cls).toUpperCase();
+    const sub = [t.dist ? '~' + fmtD(t.dist) : null, Math.round(t.score*100) + '%', approaching ? 'SE ACERCA' : null].filter(Boolean).join(' · ');
+    const size = Math.round(10.5*s); c.font = `${size}px "IBM Plex Mono", monospace`;
+    const lh = size*1.45, tw = Math.max(c.measureText(head).width, c.measureText(sub).width) + size*1.1, th = lh*2 + size*.6;
+    let tx = Math.min(Math.max(2, x), W - tw - 2), ty = y - th - 3*s; if (ty < top + 4*s) ty = y + 4*s;
+    for (let i=0;i<10 && placed.some(p=>hit({x:tx,y:ty,w:tw,h:th},p)); i++) ty += th + 3*s;
+    placed.push(tag(c, [head, sub], tx, ty, size, approaching ? '#F5B14C' : col));
+  }
+  // alerta
+  if (st.alert && now < st.alertUntil){
+    const size = Math.round(13*s); c.font = `600 ${size}px "IBM Plex Mono", monospace`;
+    const text = '⚠ ' + st.alert.toUpperCase(), tw = Math.min(c.measureText(text).width + 28*s, W - 24*s), x = (W-tw)/2, y = 64*s + top;
+    const blink = reduce ? 1 : 0.75 + 0.25*Math.sin(now/120);
+    c.globalAlpha = blink; c.fillStyle = 'rgba(46,26,4,.92)'; c.fillRect(x, y, tw, 34*s);
+    c.strokeStyle = '#F5B14C'; c.lineWidth = 2*s; c.strokeRect(x, y, tw, 34*s);
+    c.fillStyle = '#F5B14C'; c.textBaseline = 'middle'; c.fillText(text, x + 14*s, y + 17*s, tw - 28*s); c.globalAlpha = 1;
+  }
+  if (st.describing){
+    const y = reduce ? H/2 : ((now/1500) % 1) * H;
+    c.fillStyle='rgba(94,225,240,.14)'; c.fillRect(0, y-20*s, W, 40*s); c.fillStyle='#5EE1F0'; c.fillRect(0, y, W, 1.5*s);
+  }
+}
+function render(){
+  const now = performance.now();
+  if (now - st.fpsT > 1000){ st.fps = st.frames; st.frames = 0; st.fpsT = now; }
+  drawHUD(ctx, view.cw, view.ch, toScreen, {safeTop: view.safeTop});
+  if (st.rec && now - st.lastComp > 66) composite(now);
+  requestAnimationFrame(render);
+}
+
+// ================= caja negra =================
+function composite(now){
+  st.lastComp = now;
+  const c = st.compCtx, W = st.comp.width, H = st.comp.height, k = W / video.videoWidth;
+  c.save(); if (S.cam === 'user'){ c.translate(W,0); c.scale(-1,1); } c.drawImage(video, 0, 0, W, H); c.restore();
+  const map = b => { let x=b[0]*k, y=b[1]*k, w=b[2]*k, h=b[3]*k; if (S.cam==='user') x = W - x - w; return [x,y,w,h]; };
+  if (S.anon) for (const t of st.tracks) if (t.cls === 'person'){
+    const [x,y,w,h] = map(t.bbox), fx = x + w*.18, fw = w*.64, fh = Math.min(h*.24, fw*1.2);
+    pixelate(c, fx, y, fw, fh);
+  }
+  const o = st.overlay, oc = st.overlayCtx; drawHUD(oc, W, H, map); c.drawImage(o, 0, 0);
+}
+const px = document.createElement('canvas'), pxc = px.getContext('2d');
+function pixelate(c, x, y, w, h){
+  if (w < 4 || h < 4) return; x = Math.max(0,x); y = Math.max(0,y);
+  px.width = 10; px.height = Math.max(4, Math.round(10*h/w));
+  pxc.drawImage(c.canvas, x, y, w, h, 0, 0, px.width, px.height);
+  c.save(); c.imageSmoothingEnabled = false; c.drawImage(px, 0, 0, px.width, px.height, x, y, w, h); c.restore();
+}
+function pickMime(){
+  const opts = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4;codecs=avc1','video/mp4'];
+  return opts.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+}
+function startRec(){
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream){ toast('Este navegador no puede grabar el bucle'); S.rec=false; $('recSw').checked=false; saveS(); return; }
+  const W = Math.min(960, video.videoWidth || 960), H = Math.round(W * (video.videoHeight||540) / (video.videoWidth||960));
+  st.comp = document.createElement('canvas'); st.comp.width = W; st.comp.height = H; st.compCtx = st.comp.getContext('2d');
+  st.overlay = document.createElement('canvas'); st.overlay.width = W; st.overlay.height = H; st.overlayCtx = st.overlay.getContext('2d');
+  st.compStream = st.comp.captureStream(15); st.mime = pickMime(); st.segs = [];
+  newSegment(); st.rotT = setInterval(() => { if (st.rec && st.rec.state === 'recording') st.rec.stop(); }, 15000);
+  log('Caja negra: grabación en bucle activa'); toast('Caja negra activa · últimos ~30 s');
+}
+function newSegment(){
+  const chunks = [], started = new Date();
+  let r; try { r = new MediaRecorder(st.compStream, st.mime ? {mimeType:st.mime, videoBitsPerSecond:1500000} : {}); } catch(e){ toast('No se pudo iniciar la grabación'); return; }
+  r.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  r.onstop = () => {
+    const blob = new Blob(chunks, {type: r.mimeType || st.mime || 'video/webm'});
+    if (blob.size) { st.segs.push({blob, started}); while (st.segs.length > 2) st.segs.shift(); }
+    if (st.onSegStop){ const f = st.onSegStop; st.onSegStop = null; f(); }
+    if (st.recOn) newSegment();
+  };
+  st.rec = r; st.recOn = true; r.start(1000);
+}
+function stopRec(){ st.recOn = false; clearInterval(st.rotT); if (st.rec && st.rec.state !== 'inactive') st.rec.stop(); st.rec = null; st.segs = []; log('Caja negra apagada'); }
+async function sha256(blob){ try { const b = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); } catch(e){ return ''; } }
+function stamp(d=new Date()){ return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`; }
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 4000); }
+async function saveEvent(){
+  const id = stamp();
+  // foto sellada con HUD
+  const W = video.videoWidth, H = video.videoHeight, c = document.createElement('canvas'); c.width = W; c.height = H; const cc = c.getContext('2d');
+  cc.save(); if (S.cam==='user'){ cc.translate(W,0); cc.scale(-1,1); } cc.drawImage(video,0,0,W,H); cc.restore();
+  const o = document.createElement('canvas'); o.width=W; o.height=H; drawHUD(o.getContext('2d'), W, H, b => { let x=b[0]; if (S.cam==='user') x = W-b[0]-b[2]; return [x,b[1],b[2],b[3]]; }); cc.drawImage(o,0,0);
+  const photo = await new Promise(r => c.toBlob(r, 'image/jpeg', .9)), ph = await sha256(photo);
+  download(photo, `jarvis-evento-${id}.jpg`); log(`Evento ${id} · foto SHA-256 ${ph.slice(0,16)}…`);
+  if (!st.rec){ say('Evento sellado. Activa la caja negra en Ajustes para guardar también los segundos previos en video.'); return; }
+  // video: cierra el segmento actual y guarda los dos últimos
+  await new Promise(r => { st.onSegStop = r; st.rec.stop(); });
+  const ext = (st.segs[0] && /mp4/.test(st.segs[0].blob.type)) ? 'mp4' : 'webm';
+  let i = 1;
+  for (const sgm of st.segs){ const h = await sha256(sgm.blob); download(sgm.blob, `jarvis-caja-negra-${id}-parte${i}.${ext}`); log(`Video parte ${i} · SHA-256 ${h.slice(0,16)}…`); i++; }
+  say('Evento sellado. Guardé la foto y los últimos segundos de video con su huella digital.');
+}
+
+// ================= resumen local ("¿qué ves?") =================
+function describeLocal(){
+  if (!st.tracks.length) return 'Despejado, señor. No detecto personas, vehículos ni objetos relevantes.';
+  const by = {}; st.tracks.forEach(t => (by[t.cls] = by[t.cls] || []).push(t));
+  const order = Object.keys(by).sort((a,b)=> (kind(a)==='persona'?-2:kind(a)==='vehiculo'?-1:0) - (kind(b)==='persona'?-2:kind(b)==='vehiculo'?-1:0) || by[b].length - by[a].length);
+  const parts = order.slice(0,4).map(cls => plural(by[cls].length, ES[cls] || cls));
+  const list = parts.length > 1 ? parts.slice(0,-1).join(', ') + ' y ' + parts[parts.length-1] : parts[0];
+  const near = st.tracks.filter(t => t.dist).sort((a,b)=>a.dist-b.dist)[0];
+  let extra = '';
+  if (near){
+    const where = sideOf(near, video.videoWidth).txt.replace('por ', 'a ');
+    extra = near.cls === 'person'
+      ? ` La persona más cercana está a unos ${fmtD(near.dist)}, ${where}.`
+      : ` Lo más cercano: ${(ES[near.cls]||near.cls).toLowerCase()}, a unos ${fmtD(near.dist)}, ${where}.`;
+  }
+  const danger = st.tracks.find(t => kind(t.cls) === 'peligro');
+  return `Veo ${list}.${extra}${danger ? ' Cuidado: hay ' + (ES[danger.cls]||'').toLowerCase() + ' a la vista.' : ''}`;
+}
+
+// ================= cerebro en el PC (Ollama) =================
+const RULES = 'Eres JARVIS, el asistente de unos lentes inteligentes. La imagen es lo que ve la cámara del usuario. Respondes en español, tratas al usuario de "señor", vas directo a lo útil en máximo 3 frases cortas y nunca inventas lo que no se ve. A las personas solo las llamas "persona": no intentes identificarlas ni deducir edad, etnia, salud u otros rasgos sensibles. Si algo que pide podría violar derechos de otras personas o la ley, no lo haces: propones la alternativa permitida más cercana que logre su objetivo.';
+function frameB64(max=640){
+  const W = video.videoWidth, H = video.videoHeight, k = Math.min(1, max/Math.max(W,H)), c = document.createElement('canvas');
+  c.width = Math.round(W*k); c.height = Math.round(H*k); c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', .82).split(',')[1];
+}
+async function askPC(question){
+  const url = (S.olUrl || '').trim().replace(/\/+$/, '');
+  if (!url){ say(question ? 'Para preguntas libres necesito el cerebro de tu PC. Configúralo en Ajustes. Mientras tanto: ' + describeLocal() : describeLocal() + ' Para descripciones más completas, conecta tu PC en Ajustes.'); return; }
+  st.describing = true; caption('Pensando…');
+  const seen = st.tracks.length ? ' Detecciones del HUD: ' + describeLocal() : '';
+  try {
+    const res = await fetch(url + '/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      model: S.olModel || 'qwen2.5vl:3b', stream: true,
+      messages: [{role:'system', content: RULES}, {role:'user', content: (question || 'Describe lo importante de lo que veo.') + seen, images:[frameB64()]}]
+    })});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '', text = '';
+    for (;;){
+      const {value, done} = await reader.read(); if (done) break;
+      buf += dec.decode(value, {stream:true}); const lines = buf.split('\n'); buf = lines.pop();
+      for (const l of lines){ if (!l.trim()) continue; try { const j = JSON.parse(l); if (j.message && j.message.content){ text += j.message.content; caption(text); } } catch(e){} }
+    }
+    say(text.trim() || 'No obtuve respuesta del modelo.');
+    log('PC respondió (' + (S.olModel||'qwen2.5vl:3b') + ')');
+  } catch(e){
+    say('No pude conectar con tu PC. Revisa la dirección, que Ollama esté abierto y el permiso de origen. ' + describeLocal());
+    log('Error con el PC: ' + (e.message || e), true);
+  } finally { st.describing = false; }
+}
+
+// ================= briefing =================
+async function briefing(){
+  const d = new Date(), parts = [`Son las ${d.getHours()}:${pad(d.getMinutes())}.`];
+  if (st.battery != null) parts.push(`Batería al ${st.battery} por ciento.`);
+  try {
+    const pos = await new Promise((ok, ko) => navigator.geolocation.getCurrentPosition(ok, ko, {timeout:8000, maximumAge:600000}));
+    const {latitude:la, longitude:lo} = pos.coords;
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la.toFixed(3)}&longitude=${lo.toFixed(3)}&current=temperature_2m&hourly=precipitation_probability&forecast_hours=3&timezone=auto`);
+    const j = await r.json(); const temp = Math.round(j.current.temperature_2m), rain = Math.max(...(j.hourly.precipitation_probability || [0]));
+    st.weather = {short:`${temp}°C · LLUVIA ${rain}%`};
+    parts.push(`Hay ${temp} grados${rain >= 40 ? ` y ${rain} por ciento de probabilidad de lluvia en las próximas tres horas: lleve paraguas` : rain > 0 ? `, con poca probabilidad de lluvia` : ', sin lluvia a la vista'}.`);
+  } catch(e){ parts.push('No pude obtener el clima: revisa el permiso de ubicación.'); }
+  parts.push(describeLocal());
+  say(parts.join(' ')); log('Briefing');
+}
+
+// ================= voz: comandos =================
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, wantListen = false;
+function handleCommand(raw){
+  const t = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const cmd = t.replace(/^.*?jarvis[,\s]*/, '');
+  log('Oído: “' + raw + '”');
+  if (!cmd) { say('¿Sí, señor?'); return; }
+  if (/(que ves|que hay|alrededor|escanea)/.test(cmd)) return say(describeLocal());
+  if (/(describe|describeme|analiza)/.test(cmd)) return askPC();
+  if (/(briefing|resumen del dia|como esta el dia|clima)/.test(cmd)) return briefing();
+  if (/(guarda|graba eso|sella)/.test(cmd)) return saveEvent();
+  if (/(silencio|callate|modo silencioso)/.test(cmd)){ S.alerts='off'; $('alertSel').value='off'; saveS(); return say('Alertas en silencio.'); }
+  if (/(activa (las )?alertas|todas las alertas)/.test(cmd)){ S.alerts = /todas/.test(cmd) ? 'all' : 'essential'; $('alertSel').value=S.alerts; saveS(); return say('Alertas activadas.'); }
+  if (/(hora)/.test(cmd)){ const d=new Date(); return say(`Son las ${d.getHours()}:${pad(d.getMinutes())}.`); }
+  if (/(caja negra|activa la grabacion)/.test(cmd)){ setRec(true); return say('Caja negra activada.'); }
+  return askPC(raw.replace(/^.*?jarvis[,\s]*/i, ''));
+}
+function listenOnce(){
+  if (!SR){ toast('Este navegador no reconoce voz. Usa los botones.'); return; }
+  try { if (rec) rec.abort(); } catch(e){}
+  rec = new SR(); rec.lang = 'es-MX'; rec.interimResults = false; rec.maxAlternatives = 1; rec.continuous = !!wantListen;
+  rec.onstart = () => { st.listening = true; $('micBtn').classList.add('on'); };
+  rec.onresult = e => {
+    const r = e.results[e.results.length-1][0].transcript;
+    if (wantListen){ if (/jarvis/i.test(r)) handleCommand(r); } else handleCommand('jarvis ' + r);
+  };
+  rec.onerror = e => { if (e.error === 'not-allowed'){ toast('Permite el micrófono para hablarle'); wantListen = false; $('listenSw').checked=false; S.listen=false; saveS(); } };
+  rec.onend = () => { st.listening = false; $('micBtn').classList.remove('on'); if (wantListen && st.running) setTimeout(listenOnce, 300); };
+  try { rec.start(); } catch(e){}
+}
+
+// ================= sensores =================
+function onOrient(e){
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
+  else if (e.absolute && typeof e.alpha === 'number') h = 360 - e.alpha;
+  if (h != null) st.heading = (h + 360) % 360;
+}
+async function sensors(){
+  try {
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      if (await DeviceOrientationEvent.requestPermission() === 'granted') addEventListener('deviceorientation', onOrient);
+    } else { addEventListener('deviceorientationabsolute', onOrient); addEventListener('deviceorientation', onOrient); }
+  } catch(e){}
+  try { if (navigator.getBattery){ const b = await navigator.getBattery(); const u = () => st.battery = Math.round(b.level*100); u(); b.addEventListener('levelchange', u); } } catch(e){}
+  wake();
+}
+async function wake(){ try { if ('wakeLock' in navigator) st.wake = await navigator.wakeLock.request('screen'); } catch(e){} }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && st.running) wake(); });
+
+// ================= controles =================
+function setRec(on){ S.rec = on; $('recSw').checked = on; saveS(); if (on && !st.recOn) startRec(); if (!on && st.recOn) stopRec(); }
+$('startBtn').onclick = async () => {
+  const b = $('startBtn'); b.disabled = true; b.textContent = 'Iniciando…';
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch(e){}
+  try { await startCamera(); }
+  catch(e){ $('startStatus').textContent = 'No pude abrir la cámara: ' + (e.name === 'NotAllowedError' ? 'permite el acceso a la cámara para este sitio.' : (e.message || e)); b.disabled = false; b.textContent = 'Reintentar'; return; }
+  await sensors();
+  $('start').hidden = true; $('bar').hidden = false; st.running = true;
+  try { document.documentElement.requestFullscreen && await document.documentElement.requestFullscreen({navigationUI:'hide'}); } catch(e){}
+  detectLoop(); render();
+  if (S.rec) startRec();
+  if (S.listen && SR){ wantListen = true; listenOnce(); }
+  say('Sistemas en línea. A sus órdenes, señor.');
+  log('JARVIS en línea · cámara ' + (S.cam === 'user' ? 'frontal' : 'trasera') + ' · ' + video.videoWidth + '×' + video.videoHeight);
+};
+$('micBtn').onclick = () => { if (st.listening && !wantListen){ try{ rec.stop(); }catch(e){} return; } if (wantListen){ toast('Escucha continua activa: di “JARVIS…”'); return; } listenOnce(); };
+$('seeBtn').onclick = () => say(describeLocal());
+$('descBtn').onclick = () => askPC();
+$('saveBtn').onclick = saveEvent;
+$('menuBtn').onclick = () => { $('sheet').hidden = false; };
+$('closeSheet').onclick = () => { $('sheet').hidden = true; };
+
+// valores iniciales del formulario
+$('modelSel').value = S.model; $('camSel').value = S.cam; $('alertSel').value = S.alerts;
+$('voiceSw').checked = S.voice; $('beepSw').checked = S.beep; $('listenSw').checked = S.listen; $('recSw').checked = S.rec; $('anonSw').checked = S.anon;
+$('olUrl').value = S.olUrl; $('olModel').value = S.olModel;
+if (!SR) $('listenSw').disabled = true;
+
+$('modelSel').onchange = async e => { S.model = e.target.value; saveS(); toast('Cargando modelo…'); try { st.model = await cocoSsd.load({base:S.model}); toast('Modelo listo'); } catch(err){ toast('No se pudo cambiar el modelo'); } };
+$('camSel').onchange = async e => { S.cam = e.target.value; saveS(); if (st.running){ const was = st.recOn; if (was) stopRec(); await startCamera(); if (was) startRec(); } };
+$('alertSel').onchange = e => { S.alerts = e.target.value; saveS(); };
+$('voiceSw').onchange = e => { S.voice = e.target.checked; saveS(); if (!S.voice) try{ speechSynthesis.cancel(); }catch(x){} };
+$('beepSw').onchange = e => { S.beep = e.target.checked; saveS(); if (S.beep) beep(0); };
+$('listenSw').onchange = e => { S.listen = e.target.checked; saveS(); wantListen = S.listen; if (wantListen && st.running) listenOnce(); else if (rec) try{ rec.stop(); }catch(x){} };
+$('recSw').onchange = e => setRec(e.target.checked);
+$('anonSw').onchange = e => { S.anon = e.target.checked; saveS(); };
+$('olUrl').onchange = e => { S.olUrl = e.target.value.trim(); saveS(); };
+$('olModel').onchange = e => { S.olModel = e.target.value.trim() || 'qwen2.5vl:3b'; saveS(); };
+$('olTest').onclick = async () => {
+  const url = (S.olUrl||'').replace(/\/+$/,''); if (!url) return toast('Escribe primero la dirección');
+  try { const r = await fetch(url + '/api/tags'); const j = await r.json(); const names = (j.models||[]).map(m=>m.name);
+    toast(names.length ? 'Conectado · ' + names.length + ' modelos' : 'Conectado, pero sin modelos'); log('Ollama: ' + (names.join(', ') || 'sin modelos'));
+    if (names.length && !names.includes(S.olModel)) log('Ojo: no encuentro “' + S.olModel + '” en tu PC', true);
+  } catch(e){ toast('Sin conexión con tu PC'); log('No conecta con ' + url + ': ' + (e.message||e), true); }
+};
+
+loadModel();
+})();
+</script>
+</body>
+</html>
